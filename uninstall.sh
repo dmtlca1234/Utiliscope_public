@@ -43,7 +43,21 @@ fi
 # 2. L'application.
 if [[ -e "$APP" ]]; then
     say "→ Suppression de $APP" "→ Removing $APP"
-    if [[ -w "$(dirname "$APP")" && -w "$APP" ]]; then rm -rf "$APP"; else sudo rm -rf "$APP"; fi
+    # macOS protège les apps installées (« Gestion des apps ») : sans cette
+    # autorisation pour Terminal, rm échoue même avec sudo. Repli : le Finder
+    # (qui a toujours ce droit) met l'app à la corbeille. La première fois,
+    # macOS demande d'autoriser Terminal à contrôler le Finder.
+    rm -rf "$APP" 2>/dev/null || true
+    if [[ -e "$APP" ]]; then
+        say "  macOS protège l'app : elle est mise à la corbeille par le Finder…" \
+            "  macOS protects the app: moving it to the Trash via Finder…"
+        osascript -e "tell application \"Finder\" to delete (POSIX file \"$APP\" as alias)" >/dev/null 2>&1 || true
+    fi
+    if [[ -e "$APP" ]]; then
+        say "✗ Impossible de supprimer l'app : glissez-la à la corbeille depuis Applications." \
+            "✗ Could not remove the app: drag it to the Trash from Applications."
+        exit 1
+    fi
 else
     say "  (app déjà absente : $APP)" "  (app not found: $APP)"
 fi

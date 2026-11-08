@@ -147,9 +147,21 @@ if [[ ! -w "$INSTALL_DIR" ]] || { [[ -e "$DEST" ]] && [[ ! -w "$DEST" ]]; }; the
         "Administrator password required to write to $INSTALL_DIR."
     SUDO="sudo"
 fi
+# Remplacement de l'ancienne version. macOS protège les apps installées
+# (« Gestion des apps ») : sans cette autorisation pour Terminal, rm échoue
+# avec « Operation not permitted », même avec sudo. Repli : le Finder (qui a
+# toujours ce droit) met l'ancienne version à la corbeille. La première fois,
+# macOS demande d'autoriser Terminal à contrôler le Finder.
 # DEST est un chemin fixe (dossier cible + nom de l'app) : jamais vide.
 if [[ -e "$DEST" ]]; then
-    $SUDO rm -rf "$DEST"
+    if ! $SUDO rm -rf "$DEST" 2>/dev/null || [[ -e "$DEST" ]]; then
+        say "  macOS protège l'ancienne version : elle est mise à la corbeille par le Finder…" \
+            "  macOS protects the old version: moving it to the Trash via Finder…"
+        osascript -e "tell application \"Finder\" to delete (POSIX file \"$DEST\" as alias)" >/dev/null 2>&1 || true
+    fi
+    [[ ! -e "$DEST" ]] \
+        || die "Impossible de remplacer l'ancienne version. Glissez « $APP_NAME » à la corbeille, puis relancez la commande." \
+               "Could not replace the old version. Drag \"$APP_NAME\" to the Trash, then run the command again."
 fi
 $SUDO ditto "$SRC" "$DEST"
 codesign --verify --deep --strict "$DEST" 2>/dev/null \
